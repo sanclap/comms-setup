@@ -27,13 +27,11 @@ export async function GET(req: NextRequest) {
           fontSize: 20, bold: true,
         },
         school: {
-          // Tight cover strictly between "of" (ends 264.1) and "has" (starts 491.8)
-          cover: { x: 265, y: 595.5 - 324.5, width: 226, height: 18 },
-          // Same baseline as surrounding sentence text
-          textY: 595.5 - 323.9 + 3,
-          centerX: 378,
-          fontSize: 13, bold: false,
-        },
+  cover: { x: 271, y: 595.5 - 324.5, width: 214, height: 18 },
+  textY: 595.5 - 323.9 + 3,
+  centerX: 378,
+  fontSize: 13, bold: false,
+},
         date: {
           cover: { x: 463, y: 595.5 - 415, width: 153, height: 22 },
           textY: 595.5 - 409, leftX: 467,
