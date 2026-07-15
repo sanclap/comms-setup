@@ -26,11 +26,13 @@ export async function GET(req: NextRequest) {
           textY: 595.5 - 283, centerX: 427,
           fontSize: 20, bold: true,
         },
-        school: {
-  cover: { x: 260, y: 595.5 - 325, width: 235, height: 20 },
+       school: {
+  cover: { x: 246, y: 595.5 - 325, width: 260, height: 20 },
   textY: 595.5 - 323.9 + 3,
   centerX: 378,
   fontSize: 12, bold: false,
+  prefix: "of",
+  suffix: "has actively",
 },
         date: {
           cover: { x: 463, y: 595.5 - 415, width: 153, height: 22 },
