@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
-// ONE-TIME FIX: Visit /api/fix-cert-coords?secret=YOUR_CRON_SECRET once, then delete this file.
+// ONE-TIME FIX v2: Visit /api/fix-cert-coords-v2?secret=YOUR_CRON_SECRET once, then delete.
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -10,31 +10,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const results = [];
+  // Teacher-Student-v2: the sentence reads "of [SCHOOL] has actively participated..."
+  // "of" is static text at x0=248.3-264.1 — must NOT be covered
+  // "has" starts at x0=491.8 — must NOT be covered
+  // School name replacement zone: x=266 to x=489 (between "of" and "has")
+  // This is a NARROW gap — long school names will overflow unless font shrinks aggressively
+  // and text is vertically centered exactly on the same baseline as "of"/"has" (top=307.6, bottom=323.9)
 
-  // FIX 1: Mastery cert — add underline under name
-  const { error: masteryError } = await supabaseAdmin
-    .from("certificate_templates")
-    .update({
-      fields: {
-        name: {
-          cover: { x: 296, y: 595.5 - 290, width: 250, height: 40 },
-          textY: 595.5 - 282, centerX: 421,
-          fontSize: 20, bold: true,
-          underline: { x1: 300, x2: 542 },
-        },
-        date_range: {
-          cover: { x: 374, y: 595.5 - 417, width: 276, height: 22 },
-          textY: 595.5 - 409, centerX: 512,
-          fontSize: 11, bold: true,
-        },
-      },
-    })
-    .eq("id", "mastery");
-  results.push({ id: "mastery", success: !masteryError, error: masteryError?.message });
-
-  // FIX 2: Teacher-Student-v2 — widen school cover box to fully erase old text
-  const { error: v2Error } = await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from("certificate_templates")
     .update({
       fields: {
@@ -44,8 +27,11 @@ export async function GET(req: NextRequest) {
           fontSize: 20, bold: true,
         },
         school: {
-          cover: { x: 260, y: 595.5 - 326, width: 240, height: 26 },
-          textY: 595.5 - 318, centerX: 378,
+          // Tight cover strictly between "of" (ends 264.1) and "has" (starts 491.8)
+          cover: { x: 265, y: 595.5 - 324.5, width: 226, height: 18 },
+          // Same baseline as surrounding sentence text
+          textY: 595.5 - 323.9 + 3,
+          centerX: 378,
           fontSize: 13, bold: false,
         },
         date: {
@@ -56,7 +42,6 @@ export async function GET(req: NextRequest) {
       },
     })
     .eq("id", "teacher-student-v2");
-  results.push({ id: "teacher-student-v2", success: !v2Error, error: v2Error?.message });
 
-  return NextResponse.json({ results });
+  return NextResponse.json({ success: !error, error: error?.message });
 }
