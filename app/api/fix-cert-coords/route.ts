@@ -27,10 +27,10 @@ export async function GET(req: NextRequest) {
           fontSize: 20, bold: true,
         },
         school: {
-  cover: { x: 271, y: 595.5 - 324.5, width: 214, height: 18 },
+  cover: { x: 260, y: 595.5 - 325, width: 235, height: 20 },
   textY: 595.5 - 323.9 + 3,
   centerX: 378,
-  fontSize: 13, bold: false,
+  fontSize: 12, bold: false,
 },
         date: {
           cover: { x: 463, y: 595.5 - 415, width: 153, height: 22 },
