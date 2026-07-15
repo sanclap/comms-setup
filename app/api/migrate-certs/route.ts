@@ -3,14 +3,13 @@ import { supabaseAdmin } from "@/lib/supabase";
 import fs from "fs";
 import path from "path";
 
-// ONE-TIME MIGRATION: Run this once to move built-in certs from /public into Supabase
-// Visit: /api/migrate-certs?secret=YOUR_CRON_SECRET
-// Delete this file after running successfully.
+// ONE-TIME MIGRATION: Visit /api/migrate-certs?secret=YOUR_CRON_SECRET once, then delete this file.
 
 const BUILTIN_DEFS = [
+  // File: certificate-template.pdf — original underline-style Teacher-Student cert
   {
     id: "teacher-student",
-    label: "Teacher-Student Session",
+    label: "Teacher–Student Workshop (Underline Style)",
     file: "certificate-template.pdf",
     page_width: 720, page_height: 405,
     fields: {
@@ -32,33 +31,15 @@ const BUILTIN_DEFS = [
       },
     },
   },
-  {
-    id: "cba",
-    label: "CBA Session (Free)",
-    file: "certificate-template-cba.pdf",
-    page_width: 842.2, page_height: 595.5,
-    fields: {
-      name: {
-        cover: { x: 270, y: 595.5 - 284, width: 305, height: 38 },
-        textY: 595.5 - 276, centerX: 421,
-        fontSize: 18, bold: true,
-      },
-      school: {
-        cover: { x: 308, y: 595.5 - 326, width: 140, height: 22 },
-        textY: 595.5 - 320, centerX: 378,
-        fontSize: 11, bold: false,
-      },
-      date: {
-        cover: { x: 466, y: 595.5 - 417, width: 126, height: 24 },
-        textY: 595.5 - 409, leftX: 473,
-        fontSize: 11, bold: true,
-      },
-    },
-  },
+
+  // File: certificate-template-cba.pdf — ACTUALLY a "Certificate of Mastery" design
+  // Name: [FULL NAME] top=254.3-287.3, x0=303.4-538.8
+  // Date range: "1ST JUNE 2026 TO 3RD JUNE 2026" top=397.6-414.0, x0=381.7-641.9
+  // No school field on this design
   {
     id: "mastery",
-    label: "Mastery Certificate (Paid)",
-    file: "certificate-template-mastery.pdf",
+    label: "Certificate of Mastery (Competency-Based MCQ Designer)",
+    file: "certificate-template-cba.pdf",
     page_width: 842.2, page_height: 595.5,
     fields: {
       name: {
@@ -67,9 +48,38 @@ const BUILTIN_DEFS = [
         fontSize: 20, bold: true,
       },
       date_range: {
-        cover: { x: 374, y: 595.5 - 416, width: 276, height: 22 },
+        cover: { x: 374, y: 595.5 - 417, width: 276, height: 22 },
         textY: 595.5 - 409, centerX: 512,
         fontSize: 11, bold: true,
+      },
+    },
+  },
+
+  // File: certificate-template-mastery.pdf — ACTUALLY a NEW Teacher-Student design
+  // Name: "ASHA KIRAN MINJ" top=255.7-288.7, x0=267.3-587.1
+  // School: "St. Michael's Sr. Sec. School" (embedded in sentence "of ___ has actively")
+  //   top=307.6-323.9, x0=268.5-487.5 (after "of", before "has")
+  // Date: "10th June, 2026" top=397.8-414.1, x0=466.9-589.8 (after "CONDUCTED BY EDXSO ON")
+  {
+    id: "teacher-student-v2",
+    label: "Teacher–Student Relationship (Gold Ribbon Style)",
+    file: "certificate-template-mastery.pdf",
+    page_width: 842.2, page_height: 595.5,
+    fields: {
+      name: {
+        cover: { x: 262, y: 595.5 - 289, width: 330, height: 40 },
+        textY: 595.5 - 283, centerX: 427,
+        fontSize: 20, bold: true,
+      },
+      school: {
+        cover: { x: 263, y: 595.5 - 324, width: 230, height: 22 },
+        textY: 595.5 - 318, centerX: 378,
+        fontSize: 13, bold: false,
+      },
+      date: {
+        cover: { x: 463, y: 595.5 - 415, width: 153, height: 22 },
+        textY: 595.5 - 409, leftX: 467,
+        fontSize: 11, bold: false,
       },
     },
   },
@@ -89,13 +99,12 @@ export async function GET(req: NextRequest) {
       const filePath = path.join(process.cwd(), "public", def.file);
 
       if (!fs.existsSync(filePath)) {
-        results.push({ id: def.id, success: false, error: `File not found: ${def.file}. Make sure it's in /public and deployed.` });
+        results.push({ id: def.id, success: false, error: `File not found: ${def.file}` });
         continue;
       }
 
       const bytes = fs.readFileSync(filePath);
 
-      // Upload to storage
       const { error: uploadError } = await supabaseAdmin.storage
         .from("certificates")
         .upload(`${def.id}.pdf`, bytes, { contentType: "application/pdf", upsert: true });
@@ -105,7 +114,6 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      // Save definition
       const { error: dbError } = await supabaseAdmin.from("certificate_templates").upsert({
         id: def.id,
         label: def.label,
@@ -121,7 +129,7 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      results.push({ id: def.id, success: true });
+      results.push({ id: def.id, success: true, label: def.label });
     } catch (err) {
       results.push({ id: def.id, success: false, error: String(err) });
     }
