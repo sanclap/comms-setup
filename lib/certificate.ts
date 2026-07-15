@@ -30,84 +30,42 @@ export interface CertificateDefinition {
   is_builtin?: boolean;
 }
 
-// ─── Fetch all certificate definitions from Supabase ──────────────────────
 export async function getAllCertDefs(): Promise<CertificateDefinition[]> {
   const { data, error } = await supabaseAdmin
-    .from("certificate_templates")
-    .select("*")
-    .order("created_at");
-
-  if (error) {
-    console.error("Failed to load certificate templates:", error);
-    return [];
-  }
+    .from("certificate_templates").select("*").order("created_at");
+  if (error) { console.error("Failed to load certificate templates:", error); return []; }
   return data || [];
 }
 
 export async function getCertDef(id: string): Promise<CertificateDefinition | null> {
   const { data, error } = await supabaseAdmin
-    .from("certificate_templates")
-    .select("*")
-    .eq("id", id)
-    .single();
-
+    .from("certificate_templates").select("*").eq("id", id).single();
   if (error || !data) return null;
   return data;
 }
 
-// ─── Upload a new certificate template ─────────────────────────────────────
 export async function saveCertDef(
-  id: string,
-  label: string,
-  pdfBytes: Buffer,
-  pageWidth: number,
-  pageHeight: number,
+  id: string, label: string, pdfBytes: Buffer,
+  pageWidth: number, pageHeight: number,
   fields: CertificateDefinition["fields"]
 ): Promise<{ success: boolean; error?: string }> {
   const storagePath = `${id}.pdf`;
-
-  // Upload PDF to Supabase Storage
   const { error: uploadError } = await supabaseAdmin.storage
     .from("certificates")
-    .upload(storagePath, pdfBytes, {
-      contentType: "application/pdf",
-      upsert: true,
-    });
+    .upload(storagePath, pdfBytes, { contentType: "application/pdf", upsert: true });
+  if (uploadError) return { success: false, error: `Storage upload failed: ${uploadError.message}` };
 
-  if (uploadError) {
-    return { success: false, error: `Storage upload failed: ${uploadError.message}` };
-  }
-
-  // Save definition to database
   const { error: dbError } = await supabaseAdmin
     .from("certificate_templates")
-    .upsert({
-      id,
-      label,
-      storage_path: storagePath,
-      page_width: pageWidth,
-      page_height: pageHeight,
-      fields,
-      is_builtin: false,
-    });
-
-  if (dbError) {
-    return { success: false, error: `Database save failed: ${dbError.message}` };
-  }
-
+    .upsert({ id, label, storage_path: storagePath, page_width: pageWidth, page_height: pageHeight, fields, is_builtin: false });
+  if (dbError) return { success: false, error: `Database save failed: ${dbError.message}` };
   return { success: true };
 }
 
 export async function deleteCertDef(id: string): Promise<{ success: boolean; error?: string }> {
   const def = await getCertDef(id);
-  if (def?.is_builtin) {
-    return { success: false, error: "Cannot delete built-in templates" };
-  }
-
-  if (def) {
-    await supabaseAdmin.storage.from("certificates").remove([def.storage_path]);
-  }
-
+  if (def?.is_builtin) return { success: false, error: "Cannot delete built-in templates" };
+  if (def) await supabaseAdmin.storage.from("certificates").remove([def.storage_path]);
   const { error } = await supabaseAdmin.from("certificate_templates").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
   return { success: true };
@@ -122,28 +80,16 @@ export function formatEventDate(dateStr: string): string {
   return `${day}${suffix} ${month} ${year}`;
 }
 
-// ─── Generate a certificate PDF ─────────────────────────────────────────────
 export async function generateCertificate(
   certId: string,
-  vars: {
-    full_name: string;
-    school?: string;
-    event_date?: string;
-    event_date_label?: string;
-    date_range?: string;
-  }
+  vars: { full_name: string; school?: string; event_date?: string; event_date_label?: string; date_range?: string; }
 ): Promise<Uint8Array> {
   const def = await getCertDef(certId);
   if (!def) throw new Error(`Certificate template not found: ${certId}`);
 
-  // Download the PDF template from Supabase Storage
   const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-    .from("certificates")
-    .download(def.storage_path);
-
-  if (downloadError || !fileData) {
-    throw new Error(`Failed to download certificate template: ${downloadError?.message}`);
-  }
+    .from("certificates").download(def.storage_path);
+  if (downloadError || !fileData) throw new Error(`Failed to download certificate template: ${downloadError?.message}`);
 
   const templateBytes = Buffer.from(await fileData.arrayBuffer());
   const pdfDoc = await PDFDocument.load(templateBytes);
@@ -155,7 +101,8 @@ export async function generateCertificate(
     if (!text?.trim()) return;
     const font = field.bold ? boldFont : regularFont;
 
-    page.drawRectangle({ ...field.cover, color: WHITE, borderWidth: 0 });
+    // Erase old text — cover box must be fully opaque and correctly sized
+    page.drawRectangle({ ...field.cover, color: WHITE, borderWidth: 0, opacity: 1 });
 
     let fontSize = field.fontSize;
     const maxWidth = field.cover.width - 4;
@@ -169,8 +116,8 @@ export async function generateCertificate(
 
     if (field.underline) {
       page.drawLine({
-        start: { x: field.underline.x1, y: field.textY - 2 },
-        end:   { x: field.underline.x2, y: field.textY - 2 },
+        start: { x: field.underline.x1, y: field.textY - 4 },
+        end:   { x: field.underline.x2, y: field.textY - 4 },
         thickness: 0.75, color: GREY,
       });
     }
