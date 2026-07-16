@@ -13,6 +13,13 @@ export interface CertificateField {
   fontSize: number;
   bold: boolean;
   underline?: { x1: number; x2: number };
+  // Static text drawn alongside the dynamic value (e.g. "of" before school, "has" after)
+  // Needed when the cover box erases surrounding static words that must be redrawn.
+  prefixText?: string;
+  prefixX?: number;
+  suffixText?: string;
+  suffixX?: number;
+  staticFontSize?: number; // font size for prefix/suffix (defaults to fontSize)
 }
 
 export interface CertificateDefinition {
@@ -101,9 +108,19 @@ export async function generateCertificate(
     if (!text?.trim()) return;
     const font = field.bold ? boldFont : regularFont;
 
-    // Erase old text — cover box must be fully opaque and correctly sized
+    // Erase the entire zone — including any static words that will be redrawn below
     page.drawRectangle({ ...field.cover, color: WHITE, borderWidth: 0, opacity: 1 });
 
+    // Redraw static prefix text (e.g. "of") if this field has one
+    if (field.prefixText && field.prefixX !== undefined) {
+      page.drawText(field.prefixText, {
+        x: field.prefixX, y: field.textY,
+        size: field.staticFontSize || field.fontSize,
+        font: regularFont, color: BLACK,
+      });
+    }
+
+    // Auto-shrink dynamic text to fit its slot
     let fontSize = field.fontSize;
     const maxWidth = field.cover.width - 4;
     while (font.widthOfTextAtSize(text, fontSize) > maxWidth && fontSize > 7) fontSize -= 0.5;
@@ -113,6 +130,15 @@ export async function generateCertificate(
       : field.leftX!;
 
     page.drawText(text, { x, y: field.textY, size: fontSize, font, color: BLACK });
+
+    // Redraw static suffix text (e.g. "has actively") if this field has one
+    if (field.suffixText && field.suffixX !== undefined) {
+      page.drawText(field.suffixText, {
+        x: field.suffixX, y: field.textY,
+        size: field.staticFontSize || field.fontSize,
+        font: regularFont, color: BLACK,
+      });
+    }
 
     if (field.underline) {
       page.drawLine({

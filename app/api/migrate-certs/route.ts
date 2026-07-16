@@ -3,7 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase";
 import fs from "fs";
 import path from "path";
 
-// ONE-TIME MIGRATION: Visit /api/migrate-certs?secret=YOUR_CRON_SECRET once, then delete this file.
+// Visit /api/migrate-certs?secret=YOUR_CRON_SECRET to (re)seed built-in certificates.
+// Safe to re-run anytime — uses upsert, so re-running just updates coordinates.
 
 const BUILTIN_DEFS = [
   // File: certificate-template.pdf — original underline-style Teacher-Student cert
@@ -32,10 +33,7 @@ const BUILTIN_DEFS = [
     },
   },
 
-  // File: certificate-template-cba.pdf — ACTUALLY a "Certificate of Mastery" design
-  // Name: [FULL NAME] top=254.3-287.3, x0=303.4-538.8
-  // Date range: "1ST JUNE 2026 TO 3RD JUNE 2026" top=397.6-414.0, x0=381.7-641.9
-  // No school field on this design
+  // File: certificate-template-cba.pdf — "Certificate of Mastery" design
   {
     id: "mastery",
     label: "Certificate of Mastery (Competency-Based MCQ Designer)",
@@ -46,6 +44,7 @@ const BUILTIN_DEFS = [
         cover: { x: 296, y: 595.5 - 290, width: 250, height: 40 },
         textY: 595.5 - 282, centerX: 421,
         fontSize: 20, bold: true,
+        underline: { x1: 300, x2: 542 },
       },
       date_range: {
         cover: { x: 374, y: 595.5 - 417, width: 276, height: 22 },
@@ -55,11 +54,11 @@ const BUILTIN_DEFS = [
     },
   },
 
-  // File: certificate-template-mastery.pdf — ACTUALLY a NEW Teacher-Student design
-  // Name: "ASHA KIRAN MINJ" top=255.7-288.7, x0=267.3-587.1
-  // School: "St. Michael's Sr. Sec. School" (embedded in sentence "of ___ has actively")
-  //   top=307.6-323.9, x0=268.5-487.5 (after "of", before "has")
-  // Date: "10th June, 2026" top=397.8-414.1, x0=466.9-589.8 (after "CONDUCTED BY EDXSO ON")
+  // File: certificate-template-mastery.pdf — Gold Ribbon Teacher-Student design
+  // Sentence: "of [SCHOOL] has actively participated..."
+  // "of" x0=248.3-264.1 · "has" x0=491.8-521.8 (both regular, non-bold, ~fontSize 13)
+  // Erase the ENTIRE zone from before "of" to after "has", then redraw all 3 pieces:
+  //   "of" (static, left) → school name (dynamic, centered) → "has" (static, right)
   {
     id: "teacher-student-v2",
     label: "Teacher–Student Relationship (Gold Ribbon Style)",
@@ -72,9 +71,14 @@ const BUILTIN_DEFS = [
         fontSize: 20, bold: true,
       },
       school: {
-        cover: { x: 263, y: 595.5 - 324, width: 230, height: 22 },
-        textY: 595.5 - 318, centerX: 378,
-        fontSize: 13, bold: false,
+        // Full erase zone: from just before "of" (246) to just after "has" (525)
+        cover: { x: 246, y: 595.5 - 325, width: 279, height: 20 },
+        textY: 595.5 - 323.9 + 3,
+        centerX: 378,          // midpoint between "of" end (264.1) and "has" start (491.8)
+        fontSize: 12, bold: false,
+        prefixText: "of", prefixX: 248.3,
+        suffixText: "has", suffixX: 491.8,
+        staticFontSize: 13,
       },
       date: {
         cover: { x: 463, y: 595.5 - 415, width: 153, height: 22 },
@@ -98,20 +102,24 @@ export async function GET(req: NextRequest) {
     try {
       const filePath = path.join(process.cwd(), "public", def.file);
 
-      if (!fs.existsSync(filePath)) {
-        results.push({ id: def.id, success: false, error: `File not found: ${def.file}` });
-        continue;
-      }
-
-      const bytes = fs.readFileSync(filePath);
-
-      const { error: uploadError } = await supabaseAdmin.storage
+      const { data: existingFile } = await supabaseAdmin.storage
         .from("certificates")
-        .upload(`${def.id}.pdf`, bytes, { contentType: "application/pdf", upsert: true });
+        .list("", { search: `${def.id}.pdf` });
 
-      if (uploadError) {
-        results.push({ id: def.id, success: false, error: `Upload failed: ${uploadError.message}` });
-        continue;
+      if (!existingFile || existingFile.length === 0) {
+        if (!fs.existsSync(filePath)) {
+          results.push({ id: def.id, success: false, error: `File not found: ${def.file}` });
+          continue;
+        }
+        const bytes = fs.readFileSync(filePath);
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from("certificates")
+          .upload(`${def.id}.pdf`, bytes, { contentType: "application/pdf", upsert: true });
+
+        if (uploadError) {
+          results.push({ id: def.id, success: false, error: `Upload failed: ${uploadError.message}` });
+          continue;
+        }
       }
 
       const { error: dbError } = await supabaseAdmin.from("certificate_templates").upsert({
