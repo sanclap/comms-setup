@@ -76,14 +76,16 @@ const BUILTIN_DEFS = [
         textY: 595.5 - 323.9 + 3,
         centerX: 378,          // midpoint between "of" end (264.1) and "has" start (491.8)
         fontSize: 12, bold: false,
+        fontFamily: "poppins", // matches the PDF's actual body font
         prefixText: "of", prefixX: 248.3,
         suffixText: "has", suffixX: 491.8,
-        staticFontSize: 13,
+        staticFontSize: 12,
       },
       date: {
         cover: { x: 463, y: 595.5 - 415, width: 153, height: 22 },
         textY: 595.5 - 409, leftX: 467,
         fontSize: 11, bold: false,
+        fontFamily: "poppins",
       },
     },
   },

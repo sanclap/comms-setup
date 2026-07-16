@@ -1,4 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import fs from "fs";
+import path from "path";
 import { supabaseAdmin } from "./supabase";
 
 const WHITE = rgb(1, 1, 1);
@@ -13,13 +16,12 @@ export interface CertificateField {
   fontSize: number;
   bold: boolean;
   underline?: { x1: number; x2: number };
-  // Static text drawn alongside the dynamic value (e.g. "of" before school, "has" after)
-  // Needed when the cover box erases surrounding static words that must be redrawn.
   prefixText?: string;
   prefixX?: number;
   suffixText?: string;
   suffixX?: number;
-  staticFontSize?: number; // font size for prefix/suffix (defaults to fontSize)
+  staticFontSize?: number;
+  fontFamily?: "helvetica" | "poppins"; // which embedded font to use for the dynamic text
 }
 
 export interface CertificateDefinition {
@@ -87,6 +89,12 @@ export function formatEventDate(dateStr: string): string {
   return `${day}${suffix} ${month} ${year}`;
 }
 
+function loadFontBytes(filename: string): Buffer | null {
+  const p = path.join(process.cwd(), "public", "fonts", filename);
+  if (!fs.existsSync(p)) return null;
+  return fs.readFileSync(p);
+}
+
 export async function generateCertificate(
   certId: string,
   vars: { full_name: string; school?: string; event_date?: string; event_date_label?: string; date_range?: string; }
@@ -100,18 +108,30 @@ export async function generateCertificate(
 
   const templateBytes = Buffer.from(await fileData.arrayBuffer());
   const pdfDoc = await PDFDocument.load(templateBytes);
+  pdfDoc.registerFontkit(fontkit);
+
   const page = pdfDoc.getPages()[0];
-  const boldFont    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const helveticaReg  = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  // Embed Poppins if font files are available — falls back to Helvetica if not
+  const poppinsRegBytes  = loadFontBytes("Poppins-Regular.ttf");
+  const poppinsBoldBytes = loadFontBytes("Poppins-Bold.ttf");
+  const poppinsReg  = poppinsRegBytes  ? await pdfDoc.embedFont(poppinsRegBytes)  : helveticaReg;
+  const poppinsBold = poppinsBoldBytes ? await pdfDoc.embedFont(poppinsBoldBytes) : helveticaBold;
+
+  const getFonts = (fontFamily?: string) => {
+    if (fontFamily === "poppins") return { bold: poppinsBold, regular: poppinsReg };
+    return { bold: helveticaBold, regular: helveticaReg };
+  };
 
   const drawField = (field: CertificateField, text: string) => {
     if (!text?.trim()) return;
+    const { bold: boldFont, regular: regularFont } = getFonts(field.fontFamily);
     const font = field.bold ? boldFont : regularFont;
 
-    // Erase the entire zone — including any static words that will be redrawn below
     page.drawRectangle({ ...field.cover, color: WHITE, borderWidth: 0, opacity: 1 });
 
-    // Redraw static prefix text (e.g. "of") if this field has one
     if (field.prefixText && field.prefixX !== undefined) {
       page.drawText(field.prefixText, {
         x: field.prefixX, y: field.textY,
@@ -120,7 +140,6 @@ export async function generateCertificate(
       });
     }
 
-    // Auto-shrink dynamic text to fit its slot
     let fontSize = field.fontSize;
     const maxWidth = field.cover.width - 4;
     while (font.widthOfTextAtSize(text, fontSize) > maxWidth && fontSize > 7) fontSize -= 0.5;
@@ -131,7 +150,6 @@ export async function generateCertificate(
 
     page.drawText(text, { x, y: field.textY, size: fontSize, font, color: BLACK });
 
-    // Redraw static suffix text (e.g. "has actively") if this field has one
     if (field.suffixText && field.suffixX !== undefined) {
       page.drawText(field.suffixText, {
         x: field.suffixX, y: field.textY,
