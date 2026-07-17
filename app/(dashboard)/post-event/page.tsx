@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation"; 
 import type { Event, Template } from "@/lib/types";
 
 interface Registrant { id: string; full_name: string; email: string; phone?: string; tags?: string[]; }
@@ -13,7 +14,8 @@ export default function PostEventPage() {
   const [registrants, setRegistrants] = useState<Registrant[]>([]);
   const [certDefs, setCertDefs] = useState<CertDef[]>([]);
 
-  const [selectedEvent, setSelectedEvent] = useState("");
+  const searchParams = useSearchParams();
+  const [selectedEvent, setSelectedEvent] = useState(searchParams.get("event_id") || "");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [includeCertificate, setIncludeCertificate] = useState(true);
