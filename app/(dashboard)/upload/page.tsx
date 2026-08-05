@@ -195,7 +195,7 @@ export default function UploadPage() {
               <summary className="text-xs text-red-400 cursor-pointer">{result.errors.length} error(s) — click to expand</summary>
               <div className="mt-2 space-y-1">
                 {result.errors.map((e, i) => (
-                  <div key={i} className="text-xs text-slate-400 font-mono">Row {e.row}: {e.reason} — {e.data.email}</div>
+                  <div key={i} className="text-xs text-slate-400 font-mono">Row {e.row}: {e.reason} — {e.email}</div>
                 ))}
               </div>
             </details>
