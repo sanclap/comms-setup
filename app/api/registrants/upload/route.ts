@@ -17,7 +17,18 @@ export async function POST(req: NextRequest) {
     if (!event_id) return NextResponse.json({ error: "event_id is required" }, { status: 400 });
     if (!rows || rows.length === 0) return NextResponse.json({ error: "No rows provided" }, { status: 400 });
 
-    const result: UploadResult = { imported: 0, skipped: 0, errors: [] };
+    const result: UploadResult = { imported: 0, new_count: 0, updated_count: 0, skipped: 0, errors: [] };
+
+    // Fetch existing emails for this event up front so we can tell new vs. updated rows,
+    // since upsert() doesn't report which branch it took
+    const { data: existingRegistrants } = await supabaseAdmin
+      .from("registrants")
+      .select("email")
+      .eq("event_id", event_id);
+
+    const existingEmails = new Set(
+      (existingRegistrants || []).map((r) => r.email.toLowerCase())
+    );
 
     // Process in batches to avoid overwhelming a single request, and so
     // one bad row doesn't block the rest of a large upload
@@ -25,16 +36,19 @@ export async function POST(req: NextRequest) {
       const row = rows[i];
 
       if (!row.full_name?.trim()) {
-        result.errors.push({ row: i + 2, reason: "Missing full_name", data: row });
+        result.errors.push({ row: i + 2, reason: "Missing full_name", email: row.email });
         result.skipped++;
         continue;
       }
 
       if (!row.email?.trim() || !validateEmail(row.email.trim())) {
-        result.errors.push({ row: i + 2, reason: "Invalid email", data: row });
+        result.errors.push({ row: i + 2, reason: "Invalid email", email: row.email });
         result.skipped++;
         continue;
       }
+
+      const emailLower = row.email.trim().toLowerCase();
+      const isNew = !existingEmails.has(emailLower);
 
       const school =
         row.school?.trim() ||
@@ -52,7 +66,7 @@ export async function POST(req: NextRequest) {
           {
             event_id,
             full_name: row.full_name.trim(),
-            email: row.email.trim().toLowerCase(),
+            email: emailLower,
             phone: row.phone?.trim() || null,
             school: school || null,
             tags,
@@ -61,10 +75,16 @@ export async function POST(req: NextRequest) {
         );
 
       if (error) {
-        result.errors.push({ row: i + 2, reason: error.message, data: row });
+        result.errors.push({ row: i + 2, reason: error.message, email: row.email });
         result.skipped++;
       } else {
         result.imported++;
+        if (isNew) {
+          result.new_count++;
+          existingEmails.add(emailLower); // guard against duplicate rows within the same file
+        } else {
+          result.updated_count++;
+        }
       }
     }
 
