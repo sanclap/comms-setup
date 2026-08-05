@@ -89,6 +89,35 @@ const BUILTIN_DEFS = [
       },
     },
   },
+
+  {
+    id: "cba-v2",
+    label: "Competency Based Assessment (Gold Ribbon)",
+    file: "certificate-template-cba2.pdf",
+    page_width: 842.25, page_height: 595.5,
+    fields: {
+      name: {
+        cover: { x: 250, y: 595.5 - 288.67 - 2, width: 376, height: 39 },
+        textY: 595.5 - 288.67 + 6, centerX: 438,
+        fontSize: 20, bold: true,
+      },
+      school: {
+        cover: { x: 260, y: 595.5 - 323.92 - 2, width: 251, height: 22 },
+        textY: 595.5 - 323.92 + 3, centerX: 378,
+        fontSize: 12, bold: false,
+        fontFamily: "poppins",
+        prefixText: "of", prefixX: 264,
+        suffixText: "has", suffixX: 476,
+        staticFontSize: 12,
+      },
+      date: {
+        cover: { x: 461, y: 595.5 - 414.12 - 2, width: 138, height: 22 },
+        textY: 595.5 - 414.12 + 6, leftX: 464,
+        fontSize: 11, bold: false,
+        fontFamily: "poppins",
+      },
+    },
+  },
 ];
 
 export async function GET(req: NextRequest) {
