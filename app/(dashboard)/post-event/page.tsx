@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation"; 
 import type { Event, Template } from "@/lib/types";
 
@@ -8,7 +8,7 @@ interface CertDef { id: string; label: string; }
 
 const BATCH_SIZE = 30;
 
-export default function PostEventPage() {
+function PostEventContent() {
   const [events, setEvents] = useState<Event[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [registrants, setRegistrants] = useState<Registrant[]>([]);
@@ -227,5 +227,13 @@ export default function PostEventPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function PostEventPage() {
+  return (
+    <Suspense fallback={<div className="max-w-4xl text-sm text-slate-500">Loading…</div>}>
+      <PostEventContent />
+    </Suspense>
   );
 }
