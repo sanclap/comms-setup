@@ -23,6 +23,7 @@ export interface CertificateField {
   staticFontSize?: number;
   fontFamily?: "helvetica" | "poppins"; // which embedded font to use for the dynamic text
   suffixGap?: number; // if set, suffixX is computed dynamically instead of using a fixed suffixX
+  color?: [number, number, number];
 }
 
 export interface CertificateDefinition {
@@ -149,7 +150,10 @@ export async function generateCertificate(
       ? field.centerX - font.widthOfTextAtSize(text, fontSize) / 2
       : field.leftX!;
 
-    page.drawText(text, { x, y: field.textY, size: fontSize, font, color: BLACK });
+    page.drawText(text, {
+  x, y: field.textY, size: fontSize, font,
+  color: field.color ? rgb(...field.color) : BLACK,
+});
 
     if (field.suffixText) {
   const suffixX = field.suffixGap !== undefined
